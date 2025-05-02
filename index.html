@@ -20,14 +20,31 @@
         <button onclick="logout()">Logout</button>
 
         <div id="earnings-overview">
-            <h3>Total App Earnings</h3>
-            <p id="total-earnings">₹0</p>
+            <h3>Overview</h3>
+            <p id="total-earnings">Total Earnings: ₹0</p>
+            <p id="total-coins">Total Coins: 0</p>
         </div>
 
         <div id="search-section">
             <input type="text" id="searchUser" placeholder="Search by Name or Email">
             <button onclick="searchUsers()">Search</button>
         </div>
+
+        <h3>Pending Withdrawal Requests</h3>
+        <table id="withdrawals-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Amount (₹)</th>
+                    <th>Method</th>
+                    <th>Gift Card Number</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
 
         <h3>Users</h3>
         <table id="users-table">
@@ -43,20 +60,6 @@
             </thead>
             <tbody></tbody>
         </table>
-
-        <h3>Pending Withdrawal Requests</h3>
-        <table id="withdrawals-table">
-            <thead>
-                <tr>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Amount (₹)</th>
-                    <th>Method</th>
-                    <th>Gift Card Number</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
             <tbody></tbody>
         </table>
 
