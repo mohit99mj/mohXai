@@ -102,6 +102,9 @@ async function fetchUsers() {
                     hour12: true 
                   }) 
                 : "N/A";
+            // Determine block status
+            const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
+            const blockButtonText = isBlocked ? "Unblock" : "Block";
             const row = `<tr onclick="showUserDetails('${id}')">
                 <td>${user.name || "Unknown"}</td>
                 <td>${user.email || "N/A"}</td>
@@ -109,7 +112,10 @@ async function fetchUsers() {
                 <td>${user.coins || 0}</td>
                 <td>₹${totalWithdrawn}</td>
                 <td>${registerDate}</td>
-                <td><button onclick="event.stopPropagation(); deleteUser('${id}')">Delete</button></td>
+                <td>
+                    <button onclick="event.stopPropagation(); toggleBlockUser('${id}', ${isBlocked})">${blockButtonText}</button>
+                    <button onclick="event.stopPropagation(); deleteUser('${id}')">Delete</button>
+                </td>
             </tr>`;
             tableBody.innerHTML += row;
         });
@@ -162,6 +168,10 @@ async function fetchWithdrawals() {
                         </tr>`;
                         tableBody.innerHTML += row;
                     }
+                    // Add Approve button for Google Play Gift Card in history table
+                    const approveButton = method === "Google Play Gift Card" 
+                        ? `<button onclick="approveWithdrawal('${userId}', ${index}, '${method}')">Approve</button>`
+                        : "";
                     historyTableBody.innerHTML += `<tr>
                         <td>${userData.name || "Unknown"}</td>
                         <td>${action}</td>
@@ -170,6 +180,7 @@ async function fetchWithdrawals() {
                         <td>${giftCardNumber}</td>
                         <td>${status}</td>
                         <td>${date}</td>
+                        <td>${approveButton}</td>
                     </tr>`;
                 });
             }
@@ -235,6 +246,9 @@ async function searchUsers() {
                     hour12: true 
                   }) 
                 : "N/A";
+            // Determine block status
+            const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
+            const blockButtonText = isBlocked ? "Unblock" : "Block";
             const row = `<tr onclick="showUserDetails('${id}')">
                 <td>${user.name || "Unknown"}</td>
                 <td>${user.email || "N/A"}</td>
@@ -242,7 +256,10 @@ async function searchUsers() {
                 <td>${user.coins || 0}</td>
                 <td>₹${totalWithdrawn}</td>
                 <td>${registerDate}</td>
-                <td><button onclick="event.stopPropagation(); deleteUser('${id}')">Delete</button></td>
+                <td>
+                    <button onclick="event.stopPropagation(); toggleBlockUser('${id}', ${isBlocked})">${blockButtonText}</button>
+                    <button onclick="event.stopPropagation(); deleteUser('${id}')">Delete</button>
+                </td>
             </tr>`;
             tableBody.innerHTML += row;
         });
@@ -253,14 +270,10 @@ async function searchUsers() {
 
 // Approve Withdrawal
 function approveWithdrawal(userId, index, method) {
-    if (method === "Google Play Gift Card") {
-        showApproveModal(userId, index);
-    } else {
-        updateWithdrawalStatus(userId, index, "Success", null);
-    }
+    showApproveModal(userId, index);
 }
 
-// Show Approve Modal (Only for Google Play Gift Card)
+// Show Approve Modal (For Google Play Gift Card)
 function showApproveModal(userId, index) {
     currentUserId = userId;
     currentIndex = index;
@@ -279,7 +292,7 @@ function closeApproveModal() {
     document.getElementById("approveModal").style.display = "none";
 }
 
-// Submit Approval (Only for Google Play Gift Card)
+// Submit Approval (For Google Play Gift Card)
 async function submitApproval() {
     const inputValue = document.getElementById("approveInput").value.trim();
     if (!inputValue) {
@@ -349,6 +362,41 @@ function confirmRejection(userId, index) {
     }
 }
 
+// Toggle Block/Unblock User
+async function toggleBlockUser(userId, isBlocked) {
+    if (!confirm(`Are you sure you want to ${isBlocked ? 'unblock' : 'block'} this user?`)) {
+        return;
+    }
+    try {
+        const userRef = doc(db, "users", userId);
+        if (isBlocked) {
+            // Unblock: Clear block_until and suspicious_count
+            await updateDoc(userRef, {
+                block_until: null,
+                suspicious_count: 0
+            });
+            alert("User unblocked successfully!");
+        } else {
+            // Block: Set block_until to 24 hours from now and suspicious_count to 5
+            const blockUntil = new Date();
+            blockUntil.setHours(blockUntil.getHours() + 24);
+            await updateDoc(userRef, {
+                block_until: blockUntil,
+                suspicious_count: 5
+            });
+            alert("User blocked for 24 hours!");
+        }
+        fetchUsers(); // Refresh user table
+        // Refresh user details if open
+        if (document.getElementById("userPanel").classList.contains("show")) {
+            showUserDetails(userId);
+        }
+    } catch (error) {
+        console.error("Error toggling block status:", error);
+        alert("Failed to toggle block status: " + error.message);
+    }
+}
+
 // Delete User
 async function deleteUser(userId) {
     if (confirm("Are you sure you want to delete this user?")) {
@@ -386,12 +434,26 @@ async function showUserDetails(userId) {
                     hour12: true 
                   }) 
                 : "N/A";
+            // Determine block status
+            const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
+            const blockStatus = isBlocked 
+                ? `Blocked until ${new Date(user.block_until.toDate()).toLocaleString('en-IN', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit', 
+                    hour12: true 
+                  })}`
+                : "Not Blocked";
             panelContent.innerHTML = `
                 <h3>${user.name || "Unknown"}</h3>
                 <p>Email: ${user.email || "N/A"}</p>
                 <p>Mobile Number: ${user.mobileNumber || "N/A"}</p>
                 <p>Coins: ${user.coins || 0}</p>
                 <p>Register Date: ${registerDate}</p>
+                <p>Block Status: ${blockStatus}</p>
                 <div>
                     <input type="number" id="coinInput" placeholder="Enter new coin value" min="0">
                     <button onclick="updateUserCoins('${userId}')">Update Coins</button>
@@ -437,3 +499,4 @@ window.closeUserPanel = closeUserPanel;
 window.logout = logout;
 window.deleteUser = deleteUser;
 window.updateUserCoins = updateUserCoins;
+window.toggleBlockUser = toggleBlockUser;
