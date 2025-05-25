@@ -90,7 +90,6 @@ async function fetchUsers() {
 
         users.forEach(({ id, data: user }) => {
             const totalWithdrawn = calculateTotalWithdrawn(user.withdrawalHistory);
-            // Format registerDate if it exists, else show "N/A"
             const registerDate = user.registerDate 
                 ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { 
                     year: 'numeric', 
@@ -102,7 +101,6 @@ async function fetchUsers() {
                     hour12: true 
                   }) 
                 : "N/A";
-            // Determine block status
             const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
             const blockButtonText = isBlocked ? "Unblock" : "Block";
             const row = `<tr onclick="showUserDetails('${id}')">
@@ -136,7 +134,6 @@ async function fetchWithdrawals() {
         querySnapshot.forEach(docSnap => {
             const userData = docSnap.data();
             const userId = docSnap.id;
-            // Format registerDate if it exists, else show "N/A"
             const registerDate = userData.registerDate 
                 ? new Date(userData.registerDate.toDate()).toLocaleString('en-IN', { 
                     year: 'numeric', 
@@ -153,6 +150,9 @@ async function fetchWithdrawals() {
                 userData.withdrawalHistory.forEach((entry, index) => {
                     const { action, amount, status, method, giftCardNumber, date } = parseWithdrawalEntry(entry);
                     if (status === "Pending") {
+                        const approveButton = method === "Google Play Gift Card"
+                            ? `<button onclick="showApproveModal('${userId}', ${index}, '${method}')">Approve</button>`
+                            : `<button onclick="approveWithdrawal('${userId}', ${index}, '${method}')">Approve</button>`;
                         const row = `<tr>
                             <td>${userData.name || "Unknown"}</td>
                             <td>${action}</td>
@@ -162,15 +162,14 @@ async function fetchWithdrawals() {
                             <td>${status}</td>
                             <td>${registerDate}</td>
                             <td>
-                                <button onclick="approveWithdrawal('${userId}', ${index}, '${method}')">Approve</button>
+                                ${approveButton}
                                 <button onclick="confirmRejection('${userId}', ${index})">Reject</button>
                             </td>
                         </tr>`;
                         tableBody.innerHTML += row;
                     }
-                    // Add Approve button for Google Play Gift Card in history table
-                    const approveButton = method === "Google Play Gift Card" 
-                        ? `<button onclick="approveWithdrawal('${userId}', ${index}, '${method}')">Approve</button>`
+                    const approveButton = method === "Google Play Gift Card" && status !== "Success"
+                        ? `<button onclick="showApproveModal('${userId}', ${index}, '${method}')">Approve</button>`
                         : "";
                     historyTableBody.innerHTML += `<tr>
                         <td>${userData.name || "Unknown"}</td>
@@ -221,7 +220,6 @@ async function searchUsers() {
 
     try {
         const querySnapshot = await getDocs(collection(db, "users"));
-        // Collect matching users into an array for sorting
         const users = [];
         querySnapshot.forEach(docSnap => {
             const user = docSnap.data();
@@ -229,12 +227,10 @@ async function searchUsers() {
                 users.push({ id: docSnap.id, data: user });
             }
         });
-        // Sort users by coins in descending order
         users.sort((a, b) => (b.data.coins || 0) - (a.data.coins || 0));
 
         users.forEach(({ id, data: user }) => {
             const totalWithdrawn = calculateTotalWithdrawn(user.withdrawalHistory);
-            // Format registerDate if it exists, else show "N/A"
             const registerDate = user.registerDate 
                 ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { 
                     year: 'numeric', 
@@ -246,7 +242,6 @@ async function searchUsers() {
                     hour12: true 
                   }) 
                 : "N/A";
-            // Determine block status
             const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
             const blockButtonText = isBlocked ? "Unblock" : "Block";
             const row = `<tr onclick="showUserDetails('${id}')">
@@ -269,12 +264,16 @@ async function searchUsers() {
 }
 
 // Approve Withdrawal
-function approveWithdrawal(userId, index, method) {
-    showApproveModal(userId, index);
+async function approveWithdrawal(userId, index, method) {
+    if (method === "Google Play Gift Card") {
+        showApproveModal(userId, index, method);
+    } else {
+        await updateWithdrawalStatus(userId, index, "Success");
+    }
 }
 
 // Show Approve Modal (For Google Play Gift Card)
-function showApproveModal(userId, index) {
+function showApproveModal(userId, index, method) {
     currentUserId = userId;
     currentIndex = index;
     const modal = document.getElementById("approveModal");
@@ -325,11 +324,13 @@ async function updateWithdrawalStatus(userId, index, newStatus, giftCardNumber =
                     date: new Date().toISOString()
                 };
                 await updateDoc(userRef, { withdrawalHistory });
-                fetchWithdrawals();
+                fetchWithdrawals(); // Refresh withdrawals table
+                fetchTotalEarnings(); // Update total earnings
             }
         }
     } catch (error) {
         console.error("Error updating withdrawal status:", error);
+        alert("Failed to update withdrawal status: " + error.message);
     }
 }
 
@@ -370,14 +371,12 @@ async function toggleBlockUser(userId, isBlocked) {
     try {
         const userRef = doc(db, "users", userId);
         if (isBlocked) {
-            // Unblock: Clear block_until and suspicious_count
             await updateDoc(userRef, {
                 block_until: null,
                 suspicious_count: 0
             });
             alert("User unblocked successfully!");
         } else {
-            // Block: Set block_until to 24 hours from now and suspicious_count to 5
             const blockUntil = new Date();
             blockUntil.setHours(blockUntil.getHours() + 24);
             await updateDoc(userRef, {
@@ -387,9 +386,8 @@ async function toggleBlockUser(userId, isBlocked) {
             alert("User blocked for 24 hours!");
         }
         fetchUsers(); // Refresh user table
-        // Refresh user details if open
         if (document.getElementById("userPanel").classList.contains("show")) {
-            showUserDetails(userId);
+            showUserDetails(userId); // Refresh user details if open
         }
     } catch (error) {
         console.error("Error toggling block status:", error);
@@ -403,9 +401,13 @@ async function deleteUser(userId) {
         if (confirm("This action is irreversible! Confirm again.")) {
             try {
                 await deleteDoc(doc(db, "users", userId));
-                fetchUsers();
+                fetchUsers(); // Refresh user table
+                fetchWithdrawals(); // Refresh withdrawals table
+                fetchTotalEarnings(); // Update total earnings
+                closeUserPanel(); // Close user panel if open
             } catch (error) {
                 console.error("Error deleting user:", error);
+                alert("Failed to delete user: " + error.message);
             }
         }
     }
@@ -422,7 +424,6 @@ async function showUserDetails(userId) {
 
         if (userSnap.exists()) {
             const user = userSnap.data();
-            // Format registerDate if it exists, else show "N/A"
             const registerDate = user.registerDate 
                 ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { 
                     year: 'numeric', 
@@ -434,7 +435,6 @@ async function showUserDetails(userId) {
                     hour12: true 
                   }) 
                 : "N/A";
-            // Determine block status
             const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
             const blockStatus = isBlocked 
                 ? `Blocked until ${new Date(user.block_until.toDate()).toLocaleString('en-IN', { 
@@ -464,6 +464,7 @@ async function showUserDetails(userId) {
         }
     } catch (error) {
         console.error("Error fetching user details:", error);
+        alert("Failed to fetch user details: " + error.message);
     }
 }
 
@@ -480,6 +481,7 @@ async function logout() {
         document.getElementById('login-section').style.display = 'block';
     } catch (error) {
         console.error("Error logging out:", error);
+        alert("Failed to log out: " + error.message);
     }
 }
 
@@ -499,4 +501,4 @@ window.closeUserPanel = closeUserPanel;
 window.logout = logout;
 window.deleteUser = deleteUser;
 window.updateUserCoins = updateUserCoins;
-window.toggleBlockUser = toggleBlockUser;
+window
