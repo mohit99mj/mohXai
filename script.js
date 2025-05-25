@@ -501,4 +501,4 @@ window.closeUserPanel = closeUserPanel;
 window.logout = logout;
 window.deleteUser = deleteUser;
 window.updateUserCoins = updateUserCoins;
-window
+window.toggleBlockUser = toggleBlockUser;
