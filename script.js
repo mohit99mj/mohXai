@@ -50,7 +50,7 @@ function parseWithdrawalEntry(entry) {
                 mobileNumber: match[3].split(" via ")[0] || "N/A",
                 giftCardNumber: "N/A",
                 date: "N/A",
-                transactionId: "N/A"
+                transactionId: "N/A" // पुराना डेटा, कोई ID नहीं
             };
         }
         return { 
@@ -61,9 +61,10 @@ function parseWithdrawalEntry(entry) {
             mobileNumber: "N/A",
             giftCardNumber: "N/A",
             date: "N/A",
-            transactionId: "N/A" 
+            transactionId: "N/A"
         };
     }
+    // नया ऑब्जेक्ट-आधारित डेटा पार्स करें
     return {
         action: entry.action || "Unknown",
         amount: entry.amount || "0",
@@ -72,7 +73,7 @@ function parseWithdrawalEntry(entry) {
         mobileNumber: entry.method && entry.action === "Recharged" ? entry.method.split(" via ")[0] : "N/A",
         giftCardNumber: entry.giftCardNumber || "N/A",
         date: entry.date || "N/A",
-        transactionId: entry.transactionId || "N/A"
+        transactionId: entry.transactionId || "N/A" // ट्रांज़ैक्शन आईडी निकालें
     };
 }
 
@@ -83,26 +84,16 @@ async function fetchUsers() {
 
     try {
         const querySnapshot = await getDocs(collection(db, "users"));
-        // Collect users into an array for sorting
         const users = [];
         querySnapshot.forEach(docSnap => {
             users.push({ id: docSnap.id, data: docSnap.data() });
         });
-        // Sort users by coins in descending order
         users.sort((a, b) => (b.data.coins || 0) - (a.data.coins || 0));
 
         users.forEach(({ id, data: user }) => {
             const totalWithdrawn = calculateTotalWithdrawn(user.withdrawalHistory);
             const registerDate = user.registerDate 
-                ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit', 
-                    hour12: true 
-                  }) 
+                ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) 
                 : "N/A";
             const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
             const blockButtonText = isBlocked ? "Unblock" : "Block";
@@ -138,27 +129,20 @@ async function fetchWithdrawals() {
             const userData = docSnap.data();
             const userId = docSnap.id;
             const registerDate = userData.registerDate 
-                ? new Date(userData.registerDate.toDate()).toLocaleString('en-IN', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit', 
-                    hour12: true 
-                  }) 
+                ? new Date(userData.registerDate.toDate()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) 
                 : "N/A";
 
             if (userData.withdrawalHistory && Array.isArray(userData.withdrawalHistory)) {
                 userData.withdrawalHistory.forEach((entry, index) => {
                     const { action, amount, status, method, giftCardNumber, date, transactionId } = parseWithdrawalEntry(entry);
+                    
                     if (status === "Pending") {
                         const approveButton = method === "Google Play Gift Card"
                             ? `<button onclick="showApproveModal('${userId}', ${index}, '${method}')">Approve</button>`
                             : `<button onclick="approveWithdrawal('${userId}', ${index}, '${method}')">Approve</button>`;
                         const row = `<tr>
                             <td>${userData.name || "Unknown"}</td>
-                            <td>${transactionId}</td>
+                            <td>${transactionId}</td> <!-- ट्रांज़ैक्शन आईडी दिखाएं -->
                             <td>${action}</td>
                             <td>₹${amount}</td>
                             <td>${method}</td>
@@ -172,20 +156,22 @@ async function fetchWithdrawals() {
                         </tr>`;
                         tableBody.innerHTML += row;
                     }
-                    const approveButton = method === "Google Play Gift Card" && status !== "Success"
+
+                    const historyApproveButton = method === "Google Play Gift Card" && status !== "Success"
                         ? `<button onclick="showApproveModal('${userId}', ${index}, '${method}')">Approve</button>`
                         : "";
-                    historyTableBody.innerHTML += `<tr>
+                    const historyRow = `<tr>
                         <td>${userData.name || "Unknown"}</td>
-                        <td>${transactionId}</td>
+                        <td>${transactionId}</td> <!-- ट्रांज़ैक्शन आईडी दिखाएं -->
                         <td>${action}</td>
                         <td>₹${amount}</td>
                         <td>${method}</td>
                         <td>${giftCardNumber}</td>
                         <td>${status}</td>
-                        <td>${date}</td>
-                        <td>${approveButton}</td>
+                        <td>${new Date(date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                        <td>${historyApproveButton}</td>
                     </tr>`;
+                    historyTableBody.innerHTML += historyRow;
                 });
             }
         });
@@ -194,12 +180,17 @@ async function fetchWithdrawals() {
     }
 }
 
+
 // Calculate Total Withdrawn
 function calculateTotalWithdrawn(history) {
     if (!history) return 0;
     return history.reduce((total, entry) => {
-        const { amount } = parseWithdrawalEntry(entry);
-        return total + (parseFloat(amount) || 0);
+        const { amount, status } = parseWithdrawalEntry(entry);
+        // केवल सफल निकासी की गणना करें
+        if (status === "Success" || status === "Paid") {
+            return total + (parseFloat(amount) || 0);
+        }
+        return total;
     }, 0);
 }
 
@@ -208,10 +199,14 @@ async function fetchTotalEarnings() {
     try {
         const querySnapshot = await getDocs(collection(db, "users"));
         let total = 0;
+        let totalCoins = 0;
         querySnapshot.forEach(docSnap => {
-            total += calculateTotalWithdrawn(docSnap.data().withdrawalHistory);
+            const userData = docSnap.data();
+            total += calculateTotalWithdrawn(userData.withdrawalHistory);
+            totalCoins += userData.coins || 0;
         });
-        document.getElementById("total-earnings").innerText = `₹${total.toFixed(2)}`;
+        document.getElementById("total-earnings").innerText = `Total Earnings: ₹${total.toFixed(2)}`;
+        document.getElementById("total-coins").innerText = `Total Coins: ${totalCoins}`;
     } catch (error) {
         console.error("Error fetching total earnings:", error);
     }
@@ -237,15 +232,7 @@ async function searchUsers() {
         users.forEach(({ id, data: user }) => {
             const totalWithdrawn = calculateTotalWithdrawn(user.withdrawalHistory);
             const registerDate = user.registerDate 
-                ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit', 
-                    hour12: true 
-                  }) 
+                ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) 
                 : "N/A";
             const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
             const blockButtonText = isBlocked ? "Unblock" : "Block";
@@ -320,18 +307,14 @@ async function updateWithdrawalStatus(userId, index, newStatus, giftCardNumber =
             if (withdrawalHistory.length > index) {
                 const existingEntry = parseWithdrawalEntry(withdrawalHistory[index]);
                 withdrawalHistory[index] = {
-                    action: existingEntry.action,
-                    amount: existingEntry.amount,
+                    ...existingEntry, // पुरानी एंट्री से सभी डेटा कॉपी करें
                     status: newStatus,
-                    method: existingEntry.method,
-                    mobileNumber: existingEntry.mobileNumber,
                     giftCardNumber: giftCardNumber || existingEntry.giftCardNumber,
-                    date: new Date().toISOString(),
-                    transactionId: existingEntry.transactionId
+                    date: new Date().toISOString()
                 };
                 await updateDoc(userRef, { withdrawalHistory });
-                fetchWithdrawals(); // Refresh withdrawals table
-                fetchTotalEarnings(); // Update total earnings
+                fetchWithdrawals();
+                fetchTotalEarnings();
             }
         }
     } catch (error) {
@@ -354,8 +337,8 @@ async function updateUserCoins(userId) {
         const userRef = doc(db, "users", userId);
         await updateDoc(userRef, { coins: newCoins });
         alert("Coins updated successfully!");
-        showUserDetails(userId); // Refresh user details
-        fetchUsers(); // Refresh user table
+        showUserDetails(userId);
+        fetchUsers();
     } catch (error) {
         console.error("Error updating coins:", error);
         alert("Failed to update coins: " + error.message);
@@ -391,9 +374,9 @@ async function toggleBlockUser(userId, isBlocked) {
             });
             alert("User blocked for 24 hours!");
         }
-        fetchUsers(); // Refresh user table
+        fetchUsers();
         if (document.getElementById("userPanel").classList.contains("show")) {
-            showUserDetails(userId); // Refresh user details if open
+            showUserDetails(userId);
         }
     } catch (error) {
         console.error("Error toggling block status:", error);
@@ -407,10 +390,10 @@ async function deleteUser(userId) {
         if (confirm("This action is irreversible! Confirm again.")) {
             try {
                 await deleteDoc(doc(db, "users", userId));
-                fetchUsers(); // Refresh user table
-                fetchWithdrawals(); // Refresh withdrawals table
-                fetchTotalEarnings(); // Update total earnings
-                closeUserPanel(); // Close user panel if open
+                fetchUsers();
+                fetchWithdrawals();
+                fetchTotalEarnings();
+                closeUserPanel();
             } catch (error) {
                 console.error("Error deleting user:", error);
                 alert("Failed to delete user: " + error.message);
@@ -431,27 +414,11 @@ async function showUserDetails(userId) {
         if (userSnap.exists()) {
             const user = userSnap.data();
             const registerDate = user.registerDate 
-                ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit', 
-                    hour12: true 
-                  }) 
+                ? new Date(user.registerDate.toDate()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) 
                 : "N/A";
             const isBlocked = user.block_until && new Date(user.block_until.toDate()) > new Date();
             const blockStatus = isBlocked 
-                ? `Blocked until ${new Date(user.block_until.toDate()).toLocaleString('en-IN', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit', 
-                    hour12: true 
-                  })}`
+                ? `Blocked until ${new Date(user.block_until.toDate()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`
                 : "Not Blocked";
             panelContent.innerHTML = `
                 <h3>${user.name || "Unknown"}</h3>
