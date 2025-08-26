@@ -49,7 +49,8 @@ function parseWithdrawalEntry(entry) {
                 method: match[3],
                 mobileNumber: match[3].split(" via ")[0] || "N/A",
                 giftCardNumber: "N/A",
-                date: "N/A"
+                date: "N/A",
+                transactionId: "N/A"
             };
         }
         return { 
@@ -59,7 +60,8 @@ function parseWithdrawalEntry(entry) {
             method: "N/A", 
             mobileNumber: "N/A",
             giftCardNumber: "N/A",
-            date: "N/A" 
+            date: "N/A",
+            transactionId: "N/A" 
         };
     }
     return {
@@ -69,7 +71,8 @@ function parseWithdrawalEntry(entry) {
         method: entry.method || "N/A",
         mobileNumber: entry.method && entry.action === "Recharged" ? entry.method.split(" via ")[0] : "N/A",
         giftCardNumber: entry.giftCardNumber || "N/A",
-        date: entry.date || "N/A"
+        date: entry.date || "N/A",
+        transactionId: entry.transactionId || "N/A"
     };
 }
 
@@ -148,13 +151,14 @@ async function fetchWithdrawals() {
 
             if (userData.withdrawalHistory && Array.isArray(userData.withdrawalHistory)) {
                 userData.withdrawalHistory.forEach((entry, index) => {
-                    const { action, amount, status, method, giftCardNumber, date } = parseWithdrawalEntry(entry);
+                    const { action, amount, status, method, giftCardNumber, date, transactionId } = parseWithdrawalEntry(entry);
                     if (status === "Pending") {
                         const approveButton = method === "Google Play Gift Card"
                             ? `<button onclick="showApproveModal('${userId}', ${index}, '${method}')">Approve</button>`
                             : `<button onclick="approveWithdrawal('${userId}', ${index}, '${method}')">Approve</button>`;
                         const row = `<tr>
                             <td>${userData.name || "Unknown"}</td>
+                            <td>${transactionId}</td>
                             <td>${action}</td>
                             <td>₹${amount}</td>
                             <td>${method}</td>
@@ -173,6 +177,7 @@ async function fetchWithdrawals() {
                         : "";
                     historyTableBody.innerHTML += `<tr>
                         <td>${userData.name || "Unknown"}</td>
+                        <td>${transactionId}</td>
                         <td>${action}</td>
                         <td>₹${amount}</td>
                         <td>${method}</td>
@@ -321,7 +326,8 @@ async function updateWithdrawalStatus(userId, index, newStatus, giftCardNumber =
                     method: existingEntry.method,
                     mobileNumber: existingEntry.mobileNumber,
                     giftCardNumber: giftCardNumber || existingEntry.giftCardNumber,
-                    date: new Date().toISOString()
+                    date: new Date().toISOString(),
+                    transactionId: existingEntry.transactionId
                 };
                 await updateDoc(userRef, { withdrawalHistory });
                 fetchWithdrawals(); // Refresh withdrawals table
