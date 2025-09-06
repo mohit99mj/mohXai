@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <title>Details | MohX AI Portfolio</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+</head>
+<body>
+    <div class="preloader">
+        <div class="preloader-logo">
+            <video autoplay loop muted playsinline width="120" height="120">
+                <source src="THNOkGgv3C.webm" type="video/webm">
+            </video>
+        </div>
+    </div>
+
+    <div id="3d-scene"></div>
+    
+    <header class="header">
+        <nav class="navbar container">
+            <a href="index.html" class="logo" aria-label="Home">
+                <video autoplay loop muted playsinline width="40" height="40">
+                    <source src="THNOkGgv3C.webm" type="video/webm">
+                </video>
+            </a>
+            
+            <ul class="nav-links">
+                <li><a href="index.html#home" class="nav-link" data-nav-link><i class="fas fa-home"></i><span>Home</span></a></li>
+                <li><a href="index.html#about" class="nav-link" data-nav-link><i class="fas fa-user"></i><span>About</span></a></li>
+                <li><a href="details.html" class="nav-link active" data-nav-link><i class="fas fa-info-circle"></i><span>Details</span></a></li>
+                <li><a href="index.html#projects" class="nav-link" data-nav-link><i class="fas fa-code"></i><span>Projects</span></a></li>
+                <li><a href="index.html#contact" class="nav-link" data-nav-link><i class="fas fa-envelope"></i><span>Contact</span></a></li>
+            </ul>
+            
+            <div class="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle theme">
+                <input type="checkbox" id="theme-toggle" aria-label="Toggle dark/light mode">
+                <label for="theme-toggle" class="theme-toggle-label"></label>
+            </div>
+            
+            <button class="menu-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">
+                <span class="hamburger"></span>
+            </button>
+
+            <div class="walking-robot"></div>
+        </nav>
+    </header>
+
+    <main id="main-content">
+        <section id="details" class="details section">
+            <div class="container">
+                <h2 class="section-title" data-aos="fade-up">More About Me</h2>
+                <div class="details-content standalone-details" data-aos="fade-up" data-aos-delay="100">
+                    <div class="details-list">
+                        <p class="detail-item"><strong>Full Name:</strong> Mohit Singh</p>
+                        <p class="detail-item"><strong>Location:</strong> Banda, Uttar Pradesh, India</p>
+                        <p class="detail-item"><strong>Email:</strong> mohitjadaun567@gmail.com </p>
+                        <p class="detail-item"><strong>Mobile:</strong> +91 9569358733</p>
+                        <p class="detail-item"><strong>Languages:</strong> Hindi, English </p>
+                    </div>
+                    <div class="details-action">
+                        <p>Interested in my full professional background? You can view or download my complete resume.</p>
+                        <a href="resume.pdf" target="_blank" class="btn btn-primary" download><i class="fas fa-file-pdf"></i><span>View Full Resume</span></a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Mohit Singh. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <div class="cursor-dot"></div>
+    <div class="cursor-ring"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js" defer></script>
+    <script src="script.js" defer></script>
+</body>
+</html>
