@@ -133,9 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Job Title Cycler Animation ---
     if (jobTitleCycler) {
         const jobTitles = [
-            'AI & Machine Learning Engineer',
+            'Android App Development',
             'Python Developer',
-            'Data Scientist',
+            'Data Analysis',
             'Creative Problem Solver'
         ];
         let titleIndex = 0;
